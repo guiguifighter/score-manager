@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pétanque Manager - Bénesse</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        :root {
+            --primary: #1a252f;
+            --accent: #e67e22;
+            --win: #27ae60;
+            --loss: #c0392b;
+            --light: #ecf0f1;
+            --modal-bg: rgba(0, 0, 0, 0.9);
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: var(--primary);
+            color: var(--light);
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+            touch-action: manipulation;
+        }
+
+        header {
+            background: #111;
+            width: 100%;
+            padding: 10px 0;
+            text-align: center;
+            border-bottom: 4px solid var(--accent);
+        }
+
+        /* TIMER STYLE */
+        .timer-container {
+            background: #000;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            padding: 10px 0;
+            font-family: 'Courier New', Courier, monospace;
+        }
+
+        #timerDisplay {
+            font-size: 2rem;
+            color: var(--accent);
+            font-weight: bold;
+            min-width: 100px;
+            text-align: center;
+        }
+
+        .btn-start {
+            background: var(--win);
+            color: white;
+            padding: 8px 15px;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 0.9rem;
+            width: auto;
+        }
+
+        .game-container {
+            width: 95%;
+            max-width: 450px;
+            padding: 15px;
+        }
+
+        .scoreboard {
+            display: flex;
+            justify-content: space-around;
+            background: #2c3e50;
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        .team { text-align: center; flex: 1; position: relative; }
+        .edit-pen { position: absolute; top: -10px; right: 5px; font-size: 1.2rem; cursor: pointer; opacity: 0.6; }
+        .score-total { font-size: 4.5rem; font-weight: bold; color: white; margin: 5px 0; transition: all 0.3s; }
+        .winner-text { color: var(--win) !important; transform: scale(1.1); }
+        .score-pending { font-size: 1.8rem; color: var(--accent); height: 2.2rem; font-weight: bold; }
+
+        .btn-group { display: flex; gap: 10px; justify-content: center; }
+        button { padding: 15px; width: 65px; font-size: 1.8rem; border: none; border-radius: 10px; cursor: pointer; font-weight: bold; color: white; }
+        .btn-plus { background: var(--win); }
+        .btn-minus { background: var(--loss); }
+        
+        .btn-validate {
+            width: 100%; padding: 20px; background: var(--accent); color: white; font-size: 1.5rem;
+            margin-top: 15px; border-radius: 15px; border: none; font-weight: bold; box-shadow: 0 4px 0 #a35d1a;
+        }
+
+        #customModal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--modal-bg); z-index: 1000; justify-content: center; align-items: center; }
+        .modal-content { background: #2c3e50; padding: 30px; border-radius: 20px; border: 2px solid var(--accent); text-align: center; width: 80%; max-width: 300px; animation: pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        .input-score { width: 60px; font-size: 2rem; text-align: center; padding: 10px; background: #1a252f; border: 2px solid var(--accent); color: white; border-radius: 10px; margin: 15px 0; }
+        .modal-btn { width: auto; font-size: 1.2rem; padding: 12px 25px; }
+        .history { margin-top: 20px; color: #bdc3c7; text-align: center; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h2 style="margin:0">AMICALE BÉNESSE</h2>
+    </header>
+
+    <div class="timer-container">
+        <div id="timerDisplay">00:00</div>
+        <button id="timerBtn" class="btn-start" onclick="toggleTimer()">LANCER LA PARTIE</button>
+    </div>
+
+    <div class="game-container" id="mainContainer">
+        <div class="scoreboard">
+            <div class="team" id="team1">
+                <span class="edit-pen" onclick="openEdit(1)">✏️</span>
+                <div style="font-weight:bold;">MOI</div>
+                <div id="total1" class="score-total">0</div>
+                <div id="pending1" class="score-pending"></div>
+                <div class="btn-group">
+                    <button class="btn-minus" onclick="adjust(1, -1)">-</button>
+                    <button class="btn-plus" onclick="adjust(1, 1)">+</button>
+                </div>
+            </div>
+            <div class="team" id="team2">
+                <span class="edit-pen" onclick="openEdit(2)">✏️</span>
+                <div style="font-weight:bold;">EUX</div>
+                <div id="total2" class="score-total">0</div>
+                <div id="pending2" class="score-pending"></div>
+                <div class="btn-group">
+                    <button class="btn-minus" onclick="adjust(2, -1)">-</button>
+                    <button class="btn-plus" onclick="adjust(2, 1)">+</button>
+                </div>
+            </div>
+        </div>
+
+        <button id="btnValidate" class="btn-validate" onclick="validate()">VALIDER LA MÈNE</button>
+
+        <div id="log" class="history">Prêt pour le bouchon ?</div>
+        
+        <button onclick="askReset()" style="margin-top:30px; background:none; color:#7f8c8d; border:none; width:100%; text-decoration: underline;">Nouvelle partie</button>
+    </div>
+
+    <div id="customModal"><div class="modal-content" id="modalBox"></div></div>
+
+    <script>
+        let p1 = 0, p2 = 0;
+        let gameOver = false;
+        
+        // TIMER LOGIC
+        let seconds = 0;
+        let timerInterval = null;
+        let isRunning = false;
+
+        function toggleTimer() {
+            if (!isRunning) {
+                isRunning = true;
+                document.getElementById('timerBtn').innerText = "PAUSE";
+                document.getElementById('timerBtn').style.background = "#e67e22";
+                timerInterval = setInterval(() => {
+                    seconds++;
+                    let mins = Math.floor(seconds / 60);
+                    let secs = seconds % 60;
+                    document.getElementById('timerDisplay').innerText = 
+                        (mins < 10 ? "0" + mins : mins) + ":" + (secs < 10 ? "0" + secs : secs);
+                }, 1000);
+            } else {
+                isRunning = false;
+                document.getElementById('timerBtn').innerText = "REPRENDRE";
+                document.getElementById('timerBtn').style.background = "#27ae60";
+                clearInterval(timerInterval);
+            }
+        }
+
+        function adjust(team, val) {
+            if(gameOver) return;
+            let pendingElem = document.getElementById('pending' + team);
+            if (team === 1) { p1 = Math.max(0, p1 + val); pendingElem.innerText = p1 > 0 ? "+" + p1 : ""; }
+            else { p2 = Math.max(0, p2 + val); pendingElem.innerText = p2 > 0 ? "+" + p2 : ""; }
+        }
+
+        function validate() {
+            if ((p1 === 0 && p2 === 0) || gameOver) return;
+            let t1 = document.getElementById('total1'), t2 = document.getElementById('total2');
+            let final1 = Math.min(13, parseInt(t1.innerText) + p1);
+            let final2 = Math.min(13, parseInt(t2.innerText) + p2);
+            t1.innerText = final1; t2.innerText = final2;
+            p1 = 0; p2 = 0;
+            document.getElementById('pending1').innerText = "";
+            document.getElementById('pending2').innerText = "";
+            checkWin(final1, final2);
+        }
+
+        function checkWin(s1, s2) {
+            if (s1 >= 13 || s2 >= 13) {
+                gameOver = true;
+                isRunning = false;
+                clearInterval(timerInterval);
+                document.getElementById('timerBtn').style.display = "none";
+                
+                if (s1 >= 13) {
+                    document.getElementById('total1').classList.add('winner-text');
+                    lancerConfettis();
+                    showSimpleModal("🏆 GAGNÉ !", "En miette !!!");
+                } else {
+                    document.getElementById('total2').classList.add('winner-text');
+                    document.getElementById('mainContainer').classList.add('shake');
+                    showSimpleModal("👎 PERDU", "Les carottes sont cuites !");
+                }
+            }
+        }
+
+        function lancerConfettis() {
+            var duration = 3 * 1000;
+            var end = Date.now() + duration;
+            (function frame() {
+                confetti({ particleCount: 3, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#e67e22', '#27ae60'] });
+                confetti({ particleCount: 3, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#e67e22', '#27ae60'] });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        }
+
+        function openEdit(team) {
+            const current = document.getElementById('total' + team).innerText;
+            const box = document.getElementById('modalBox');
+            box.innerHTML = `<h3>Modifier score</h3><input type="number" id="manualScore" class="input-score" value="${current}">
+                <div class="modal-btns"><button class="modal-btn btn-minus" onclick="closeModal()">Annuler</button>
+                <button class="modal-btn btn-plus" onclick="saveManualScore(${team})">OK</button></div>`;
+            document.getElementById('customModal').style.display = "flex";
+        }
+
+        function saveManualScore(team) {
+            const newVal = parseInt(document.getElementById('manualScore').value);
+            document.getElementById('total' + team).innerText = Math.min(13, Math.max(0, newVal));
+            closeModal();
+            checkWin(parseInt(document.getElementById('total1').innerText), parseInt(document.getElementById('total2').innerText));
+        }
+
+        function askReset() {
+            const box = document.getElementById('modalBox');
+            box.innerHTML = `<h3>Reset ?</h3><p>Nouvelle partie ?</p>
+                <div class="modal-btns"><button class="modal-btn btn-minus" onclick="closeModal()">NON</button>
+                <button class="modal-btn btn-plus" onclick="location.reload()">OUI</button></div>`;
+            document.getElementById('customModal').style.display = "flex";
+        }
+
+        function showSimpleModal(title, msg) {
+            const box = document.getElementById('modalBox');
+            box.innerHTML = `<h2 style="color:var(--accent)">${title}</h2><p style="font-size:1.5rem; font-weight:bold;">${msg}</p>
+                <p>Temps de jeu : ${document.getElementById('timerDisplay').innerText}</p>
+                <button class="modal-btn btn-plus" style="width:100%" onclick="closeModal()">RETOUR</button>`;
+            document.getElementById('customModal').style.display = "flex";
+        }
+
+        function closeModal() { document.getElementById('customModal').style.display = "none"; }
+    </script>
+</body>
+</html>
